@@ -10,6 +10,8 @@ import {
 } from '@mui/icons-material';
 import {enqueueAppNotification} from "../../actions/notificationActions";
 
+import { combineCsvs } from "../../utils/combineCsv";
+
 import "./S3Table.css";
 import {processingFinished, fetchStatus} from "../../actions/appStateActions";
 import { styled } from "@mui/material/styles";
@@ -39,12 +41,14 @@ class S3Table extends Component {
             refreshBtnDisabled: false,
             refreshInterval: null,
             currentFileKey: null,
+            downloadAllDisabled: false,
         }
 
         this.componentDidMount = this.componentDidMount.bind(this);
         this.onGetData = this.onGetData.bind(this);
         this.downloadData = this.downloadData.bind(this);
         this.removeData = this.removeData.bind(this);
+        this.downloadAllData = this.downloadAllData.bind(this);
     }
 
     async componentDidMount() {
@@ -173,6 +177,32 @@ class S3Table extends Component {
             });
     }
 
+    async downloadAllData() {
+        const {files} = this.state;
+        if (!files.length) {
+            return;
+        }
+        this.setState({ downloadAllDisabled: true });
+        try {
+            const contents = await Promise.all(files.map(async ({name}) => {
+                const res = await downloadData({ key: "csv/"+name, options: { accessLevel: "protected" } }).result;
+                return { name: name, content: await res.body.text() };
+            }));
+            const blob = new Blob([combineCsvs(contents)], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "all-processed-files.csv";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 150);
+        } catch (err) {
+            console.log(err);
+            alert("Could not download all files. Some may not be ready yet.");
+        } finally {
+            this.setState({ downloadAllDisabled: false });
+        }
+    }
+
     async removeData(key) {
         remove({ key: "csv/"+key, options: { accessLevel: 'protected' } })
             .then()
@@ -221,8 +251,13 @@ class S3Table extends Component {
                                         <Grid.Column width={9} textAlign={"left"} verticalAlign={"middle"}>
                                             <span className={"refresh-btn-message"}>{(isProcessingInitiated)? <span>Please wait while your file is processed.</span> : <span>Click on the refresh button to update the table.</span>}</span>
                                         </Grid.Column>
-                                        <Grid.Column width={4}>
-
+                                        <Grid.Column width={4} textAlign={"right"} verticalAlign={"middle"}>
+                                            <button
+                                                className={"ui button"}
+                                                disabled={this.state.downloadAllDisabled || this.state.files.length === 0}
+                                                onClick={this.downloadAllData}>
+                                                Download all as one CSV
+                                            </button>
                                         </Grid.Column>
                                     </Grid.Row>
                                     <Divider />
