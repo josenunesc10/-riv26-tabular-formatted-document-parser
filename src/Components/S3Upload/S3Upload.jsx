@@ -183,7 +183,7 @@ class S3Upload extends Component {
         const fileName = file.name;
         let info;
         const [, , , extension] = /([^.]+)(\.(\w+))?$/.exec(fileName);
-        const mimeType = fileName.slice(fileName.indexOf('.')+1);
+        const mimeType = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')+1) : '';
         const keyName = uuid().concat("_").concat(fileName.replace(/\.[^/.]+$/, "")).concat("-" + mimeType);
         const key = `${keyName}${extension && '.'}${extension}`;
         addProcessingStatus({id: key, status: "Uploading", expirationTime: Math.floor(new Date().getTime()/1000.0) + 604800});
